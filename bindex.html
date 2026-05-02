@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Braille BRF Editor - Standard Mode</title>
+    <style>
+        @font-face {
+            font-family: 'SimBraille';
+            src: url('SimBraille.ttf') format('truetype');
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 0; 
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #000000;
+            color: #ffffff;
+            box-sizing: border-box;
+        }
+
+        .version-notice {
+            color: #ffff00; /* Yellow lettering */
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .top-section { flex-shrink: 0; padding: 5px; }
+        
+        .controls { 
+            margin: 10px 0; 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+        }
+        
+        button {
+            padding: 10px 15px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid #ffffff;
+            transition: opacity 0.2s;
+        }
+
+        button:active { opacity: 0.7; }
+
+        .btn-copy { background-color: #0056b3; color: white; }
+        .btn-clear { background-color: #333333; color: #ffffff; }
+        .btn-format { background-color: #28a745; color: white; border-color: #1e7e34; }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        textarea { 
+            flex-grow: 1; 
+            width: 100%;
+            /* Scales font to fit 40 chars on any screen width */
+            font-size: clamp(12px, 2.2vw, 22px); 
+            font-family: 'SimBraille', 'Courier New', monospace; 
+            padding: 2%;
+            border: 2px solid #ffffff;
+            box-sizing: border-box; 
+            line-height: 1.5;
+            white-space: pre;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
+            overflow-y: auto;
+            resize: none;
+            background-color: #000000;
+            color: #ffffff;
+            outline: none;
+        }
+
+        @media (min-width: 1000px) {
+            textarea {
+                max-width: 42ch;
+                margin: 0 auto;
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-section">
+        <p class="version-notice">this is a new version</p>
+        <h2>Client BRF Editor</h2>
+        <p>Type your draft. Use <strong>Ê</strong> for new lines. Use <strong>Format for BRF</strong> to finalize page numbering.</p>
+    </div>
+
+    <div class="controls">
+        <button class="btn-copy" onclick="copyToClipboard()">Copy to Clipboard</button>
+        <button class="btn-format" onclick="formatForBRF()">Format for BRF</button>
+        <button class="btn-clear" onclick="clearEditor()">Clear Document</button>
+    </div>
+
+    <div id="nav-announcer" class="sr-only" aria-live="assertive" aria-atomic="true" aria-hidden="true"></div>
+
+    <label for="editor" class="sr-only">Braille Editor, 40 cells per line</label>
+    
+    <textarea id="editor" aria-label="Braille Editor, 40 cells per line" spellcheck="false" wrap="off"></textarea>
+
+    <script>
+        const editor = document.getElementById('editor');
+        const navAnnouncer = document.getElementById('nav-announcer');
+        let lastLineIndex = -1;
+
+        window.onload = () => {
+            const savedText = localStorage.getItem('braille_editor_v1');
+            if (savedText) {
+                editor.value = savedText;
+                editor.selectionStart = editor.selectionEnd = editor.value.length;
+            }
+            editor.focus();
+        };
+
+        function toBrailleNumber(num) {
+            const map = { '1':'a', '2':'b', '3':'c', '4':'d', '5':'e', '6':'f', '7':'g', '8':'h', '9':'i', '0':'j' };
+            const digits = num.toString().split('').map(d => map[d]).join('');
+            return '#' + digits;
+        }
+
+        function applyWordWrap(text) {
+            const lines = text.split('\n');
+            const wrapped = [];
+            for (let line of lines) {
+                while (line.length > 40) {
+                    let breakAt = line.lastIndexOf(' ', 39);
+                    if (breakAt <= 0) {
+                        wrapped.push(line.substring(0, 40));
+                        line = line.substring(40);
+                    } else {
+                        wrapped.push(line.substring(0, breakAt));
+                        line = line.substring(breakAt).replace(/^ +/, '');
+                    }
+                }
+                wrapped.push(line);
+            }
+            return wrapped.join('\n');
+        }
+
+        function announceLine(lineIndex, lines) {
+            const lineNumber = lineIndex + 1;
+            const charCount = (lines[lineIndex] || "").length;
+            const message = `Line ${lineNumber}, ${charCount} characters`;
+
+            navAnnouncer.removeAttribute('aria-hidden');
+            navAnnouncer.textContent = '';
+            requestAnimationFrame(() => {
+                navAnnouncer.textContent = message;
+                setTimeout(() => {
+                    navAnnouncer.setAttribute('aria-hidden', 'true');
+                }, 1000);
+            });
+        }
+
+        function checkLineChange() {
+            const text = editor.value;
+            const pos = editor.selectionStart;
+            const lines = text.split('\n');
+            const currentLineIndex = text.substring(0, pos).split('\n').length - 1;
+
+            if (currentLineIndex !== lastLineIndex) {
+                announceLine(currentLineIndex, lines);
+                lastLineIndex = currentLineIndex;
+            }
+        }
+
+        document.addEventListener('selectionchange', () => {
+            if (document.activeElement === editor) checkLineChange();
+        });
+
+        function formatForBRF() {
+            let inputLines = editor.value.split('\n');
+            let finalLines = [];
+            let pageCount = 1;
+
+            inputLines.forEach((line) => {
+                let cleanLine = line.replace(/ {3,}#[a-j]+/g, '');
+
+                while (cleanLine.length > 0 || (cleanLine === "" && (finalLines.length + 1) % 25 === 0)) {
+                    let isPageEnd = (finalLines.length + 1) % 25 === 0;
+                    let pNum = isPageEnd ? toBrailleNumber(pageCount) : "";
+                    let limit = isPageEnd ? (40 - (pNum.length + 3)) : 40;
+                    let segment = "";
+
+                    if (cleanLine.length <= limit) {
+                        segment = cleanLine;
+                        cleanLine = "";
+                    } else {
+                        let lastSpace = cleanLine.lastIndexOf(' ', limit);
+                        if (lastSpace === -1) {
+                            segment = cleanLine.substring(0, limit);
+                            cleanLine = cleanLine.substring(limit);
+                        } else {
+                            segment = cleanLine.substring(0, lastSpace);
+                            cleanLine = cleanLine.substring(lastSpace + 1);
+                        }
+                    }
+
+                    if (isPageEnd) {
+                        let spacesNeeded = 40 - segment.length - pNum.length;
+                        finalLines.push(segment + " ".repeat(Math.max(3, spacesNeeded)) + pNum);
+                        pageCount++;
+                    } else {
+                        finalLines.push(segment);
+                    }
+
+                    if (cleanLine === "") break;
+                }
+            });
+
+            editor.value = finalLines.join('\n');
+            localStorage.setItem('braille_editor_v1', editor.value);
+            editor.focus();
+        }
+
+        editor.addEventListener('input', function() {
+            const start = this.selectionStart;
+
+            if (this.value.includes('Ê')) {
+                this.value = this.value.replace(/Ê/g, '\n');
+                const newPos = this.value.indexOf('\n', start - 2) + 1;
+                this.selectionStart = this.selectionEnd = newPos;
+            }
+
+            const before = this.value;
+            const wrapped = applyWordWrap(before);
+
+            if (wrapped !== before) {
+                const cursor = this.selectionStart;
+                this.value = wrapped;
+                const addedNewlines = (wrapped.substring(0, cursor + 5).split('\n').length) -
+                                      (before.substring(0, cursor + 5).split('\n').length);
+                this.selectionStart = this.selectionEnd = cursor + addedNewlines;
+            }
+
+            localStorage.setItem('braille_editor_v1', this.value);
+        });
+
+        async function copyToClipboard() {
+            if (!editor.value) return;
+            try {
+                await navigator.clipboard.writeText(editor.value);
+            } catch (err) {
+                // silent fail
+            }
+        }
+
+        function clearEditor() {
+            if (confirm("Delete saved progress and clear document?")) {
+                editor.value = '';
+                localStorage.removeItem('braille_editor_v1');
+                editor.focus();
+            }
+        }
+    </script>
+</body>
+</html>
