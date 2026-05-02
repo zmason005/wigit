@@ -1,1 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Braille Logic Inspector Pro</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+        .container { max-width: 900px; margin: auto; }
+        .monitor { background: #2d2d2d; padding: 15px; margin-bottom: 25px; border-radius: 8px; border: 1px solid #444; }
+        h2 { color: #0a84ff; border-left: 4px solid #0a84ff; padding-left: 10px; margin-bottom: 10px; font-size: 1.4rem; }
+        input { width: 100%; padding: 15px; font-size: 1.2rem; border: 2px solid #34c759; border-radius: 8px; background: #000; color: #fff; margin-bottom: 30px; box-sizing: border-box; }
+        .data { font-family: "Menlo", "monospace"; font-size: 1.1rem; min-height: 1.5em; word-break: break-all; }
+        
+        .hex-unit { display: inline-block; background: #3d3d3d; padding: 2px 6px; margin: 2px; border-radius: 4px; border-bottom: 2px solid #ff9f0a; }
+        .hex-char { color: #34c759; margin-right: 5px; font-weight: bold; }
+        .hex-code { color: #ff9f0a; font-size: 0.9rem; }
+        
+        .processed-unit { border-bottom-color: #5856d6; }
+        .processed-unit .hex-code { color: #af52de; }
+
+        button { background: #ff453a; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Braille Logic Inspector</h1>
+    <p>Focus the green-bordered field to begin capture.</p>
+    
+    <input type="text" id="mainInput" autocomplete="off" autofocus placeholder="Enter Braille Input...">
+
+    <h2>1. VoiceOver Processed Text Output</h2>
+    <div class="monitor">
+        <div id="processedOutput" class="data"></div>
+    </div>
+
+    <h2>2. Processed Text Unicode Hex Codes</h2>
+    <div class="monitor">
+        <div id="processedUnicode" class="data"></div>
+    </div>
+
+    <h2>3. Real-Time Raw Character Sequence</h2>
+    <div class="monitor">
+        <div id="rawCapture" class="data"></div>
+    </div>
+
+    <h2>4. Real-Time Raw Unicode Hex Codes</h2>
+    <div class="monitor">
+        <div id="rawUnicode" class="data"></div>
+    </div>
+    
+    <button onclick="clearAll()">Reset Inspector</button>
+</div>
+
+<script>
+    const inputEl = document.getElementById('mainInput');
+    const processedDiv = document.getElementById('processedOutput');
+    const processedUniDiv = document.getElementById('processedUnicode');
+    const rawDiv = document.getElementById('rawCapture');
+    const rawUniDiv = document.getElementById('rawUnicode');
+
+    function createHexSpan(char, isProcessed = false) {
+        const hexCode = char.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0');
+        const unit = document.createElement('span');
+        unit.className = isProcessed ? 'hex-unit processed-unit' : 'hex-unit';
+        unit.innerHTML = `<span class="hex-char">${char === ' ' ? '␣' : char}</span><span class="hex-code">U+${hexCode}</span>`;
+        return unit;
+    }
+
+    // Handlers for Real-Time Capture (Sections 3 & 4)
+    inputEl.addEventListener('beforeinput', (e) => {
+        if (e.data) {
+            Array.from(e.data).forEach(char => {
+                const charSpan = document.createElement('span');
+                charSpan.textContent = char === ' ' ? '␣' : char;
+                charSpan.style.marginRight = "5px";
+                rawDiv.appendChild(charSpan);
+                rawUniDiv.appendChild(createHexSpan(char, false));
+            });
+        }
+    });
+
+    // Handlers for Final Processing (Sections 1 & 2)
+    inputEl.addEventListener('input', (e) => {
+        const val = e.target.value;
+        processedDiv.textContent = val;
+        processedUniDiv.innerHTML = '';
+        Array.from(val).forEach(char => {
+            processedUniDiv.appendChild(createHexSpan(char, true));
+        });
+    });
+
+    function clearAll() {
+        inputEl.value = '';
+        processedDiv.textContent = '';
+        processedUniDiv.innerHTML = '';
+        rawDiv.innerHTML = '';
+        rawUniDiv.innerHTML = '';
+        inputEl.focus();
+    }
+</script>
+
+</body>
+</html>
 
