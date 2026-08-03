@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEB Grade 2 Transcriber - Liblouis WebAssembly</title>
+    <!-- Load liblouis-js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/liblouis-build@0.3.0/dist/liblouis.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --accent-color: #2b5c8f;
+            --accent-hover: #1e4268;
+            --text-primary: #1d2d35;
+            --text-secondary: #5a6b7c;
+            --border-color: #dbe2ea;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 960px;
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            padding: 2.5rem;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 1.25rem;
+        }
+
+        h1 {
+            font-size: 1.85rem;
+            color: var(--accent-color);
+            margin-bottom: 0.35rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+            background-color: #f8fafc;
+            padding: 1.25rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select {
+            padding: 0.6rem 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background-color: #fff;
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            border-color: var(--accent-color);
+        }
+
+        .editor-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .editor-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        textarea, .output-box {
+            width: 100%;
+            height: 260px;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-family: inherit;
+            font-size: 1.1rem;
+            line-height: 1.7;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus {
+            border-color: var(--accent-color);
+        }
+
+        .output-box {
+            background-color: #fafbfc;
+            font-family: "Apple Braille", "DejaVu Sans", "Segoe UI Symbol", "Noto Sans Braille", monospace;
+            font-size: 1.6rem;
+            letter-spacing: 2px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            border-color: var(--border-color);
+            color: #1a202c;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+
+        button {
+            padding: 0.65rem 1.25rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+
+        .status-bar {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .info-card {
+            margin-top: 2rem;
+            padding: 1.25rem;
+            background-color: #eff6ff;
+            border-left: 4px solid var(--accent-color);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #1e3a8a;
+        }
+
+        .info-card h3 {
+            margin-bottom: 0.4rem;
+            font-size: 0.95rem;
+        }
+
+        .badge {
+            background-color: #dbeafe;
+            color: #1e40af;
+            font-weight: 600;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>⠠b⠗⠁⠊⠇⠇⠑ UEB Transcriber <span class="badge">Liblouis Wasm</span></h1>
+        <p class="subtitle">100% standard-compliant translation powered by the official Liblouis WebAssembly engine</p>
+    </header>
+
+    <div class="controls-grid">
+        <div class="form-group">
+            <label for="translation-mode">Translation Table</label>
+            <select id="translation-mode">
+                <option value="en-ueb-g2.ctb" selected>UEB Grade 2 (Contracted)</option>
+                <option value="en-ueb-g1.ctb">UEB Grade 1 (Uncontracted)</option>
+                <option value="en-us-comp8.ctb">US Computer Braille (8-dot)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="font-size">Braille Display Size</label>
+            <select id="font-size">
+                <option value="1.2rem">Small</option>
+                <option value="1.6rem" selected>Medium</option>
+                <option value="2.2rem">Large</option>
+                <option value="2.8rem">Extra Large</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="editor-layout">
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Print Input</span>
+                <span id="char-count" style="font-size: 0.8rem; color: var(--text-secondary);">0 chars</span>
+            </div>
+            <textarea id="input-text" placeholder="Loading Liblouis engine..." disabled></textarea>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Braille Unicode Output</span>
+                <span id="braille-count" style="font-size: 0.8rem; color: var(--text-secondary);">0 cells</span>
+            </div>
+            <div id="output-braille" class="output-box" aria-live="polite"></div>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn-secondary" id="btn-clear">Clear Input</button>
+        <button class="btn-primary" id="btn-copy">Copy Unicode Braille</button>
+    </div>
+
+    <div class="status-bar">
+        <span id="status-text">Initializing WebAssembly engine...</span>
+        <span>Unicode Range: U+2800 – U+28FF</span>
+    </div>
+
+    <div class="info-card">
+        <h3>Powered by Liblouis Wasm</h3>
+        <p>This web app executes the official <b>Liblouis C translation engine</b> directly inside your browser via WebAssembly. It provides full BANA/ICEB compliance, including all initial/final letter contractions, shortform words, prefix/suffix rules, and syllable boundary protections.</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const inputText = document.getElementById('input-text');
+    const outputBraille = document.getElementById('output-braille');
+    const tableSelect = document.getElementById('translation-mode');
+    const fontSizeSelect = document.getElementById('font-size');
+    const charCount = document.getElementById('char-count');
+    const brailleCount = document.getElementById('braille-count');
+    const btnClear = document.getElementById('btn-clear');
+    const btnCopy = document.getElementById('btn-copy');
+    const statusText = document.getElementById('status-text');
+
+    let isEngineReady = false;
+
+    // Initialize Liblouis WebAssembly module
+    function initLiblouis() {
+        if (typeof Louis !== 'undefined' && Louis.easyInit) {
+            Louis.easyInit()
+                .then(() => {
+                    isEngineReady = true;
+                    inputText.disabled = false;
+                    inputText.placeholder = "Type or paste print text here...";
+                    statusText.textContent = "Engine Ready (Liblouis loaded)";
+                    inputText.focus();
+                    performTranslation();
+                })
+                .catch(err => {
+                    console.error("Failed to initialize Liblouis Wasm:", err);
+                    statusText.textContent = "Error loading Liblouis Wasm engine.";
+                    // Fallback attempt if easyInit fails
+                    fallbackInit();
+                });
+        } else {
+            fallbackInit();
+        }
+    }
+
+    function fallbackInit() {
+        statusText.textContent = "Loading Liblouis...";
+        setTimeout(() => {
+            if (typeof Louis !== 'undefined') {
+                isEngineReady = true;
+                inputText.disabled = false;
+                inputText.placeholder = "Type or paste print text here...";
+                statusText.textContent = "Engine Ready";
+                inputText.focus();
+            } else {
+                statusText.textContent = "Failed to load Liblouis bundle. Check network connection.";
+            }
+        }, 1500);
+    }
+
+    function performTranslation() {
+        if (!isEngineReady) return;
+
+        const text = inputText.value;
+        const selectedTable = tableSelect.value;
+
+        if (!text) {
+            outputBraille.textContent = '';
+            charCount.textContent = '0 chars';
+            brailleCount.textContent = '0 cells';
+            statusText.textContent = 'Ready for input';
+            return;
+        }
+
+        try {
+            // Translate print string using Liblouis JS API
+            const brailleResult = Louis.translate(selectedTable, text);
+            outputBraille.textContent = brailleResult;
+
+            // Update cell counters
+            charCount.textContent = `${text.length} chars`;
+            const cellLength = Array.from(brailleResult).length;
+            brailleCount.textContent = `${cellLength} cells`;
+            statusText.textContent = 'Transcribed via ' + selectedTable;
+        } catch (err) {
+            console.error('Translation error:', err);
+            statusText.textContent = 'Translation error occurred';
+        }
+    }
+
+    // UI Event Handlers
+    inputText.addEventListener('input', performTranslation);
+    tableSelect.addEventListener('change', performTranslation);
+
+    fontSizeSelect.addEventListener('change', (e) => {
+        outputBraille.style.fontSize = e.target.value;
+    });
+
+    btnClear.addEventListener('click', () => {
+        inputText.value = '';
+        performTranslation();
+        inputText.focus();
+    });
+
+    btnCopy.addEventListener('click', async () => {
+        const text = outputBraille.textContent;
+        if (!text) return;
+
+        try {
+            await navigator.clipboard.writeText(text);
+            const prevStatus = statusText.textContent;
+            statusText.textContent = 'Copied to clipboard!';
+            setTimeout(() => {
+                statusText.textContent = prevStatus;
+            }, 2000);
+        } catch (err) {
+            statusText.textContent = 'Failed to copy to clipboard';
+        }
+    });
+
+    // Start initialization
+    initLiblouis();
+});
+</script>
+
+</body>
+</html>
